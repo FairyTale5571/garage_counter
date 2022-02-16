@@ -47,12 +47,17 @@ func ConnectDatabase() (*sql.DB, error) {
 	return db, nil
 }
 
-func countVeh(id string,array []string) string {
-	stmt := sq.Select("COUNT(*)").From("vehicles").Where(sq.Eq{"pid":id},sq.NotEq{"classname": array}).Where(sq.Eq{"deleted_at":nil}).Where(sq.NotEq{"classname":array})
+func insertCpu(cps, fps, players string) string {
+	db.Query("INSERT INTO server_performance SET cps = ?, fps = ?, players = ?, insert_time = now()", cps, fps, players)
+	return "0"
+}
+
+func countVeh(id string, array []string) string {
+	stmt := sq.Select("COUNT(*)").From("vehicles").Where(sq.Eq{"pid": id}, sq.NotEq{"classname": array}).Where(sq.Eq{"deleted_at": nil}).Where(sq.NotEq{"classname": array})
 	sql, args, _ := stmt.ToSql()
-	rows, err := db.Query(sql,args...)
+	rows, err := db.Query(sql, args...)
 	if err != nil {
-		logger.PrintLog("error: %v",err.Error())
+		logger.PrintLog("error: %v", err.Error())
 		return "0"
 	}
 	defer rows.Close()

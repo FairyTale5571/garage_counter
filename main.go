@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"unsafe"
 )
+
 var dbConnected = false
 
 //export goRVExtensionVersion
@@ -32,30 +33,31 @@ func goRVExtensionArgs(output *C.char, outputsize C.size_t, input *C.char, argv 
 	action := C.GoString(input)
 	clearArgs := cleanInput(argv, int(argc))
 
+	if !dbConnected {
+		fmt.Printf("database not connected\n")
+		printInArma(output, outputsize, "db not con")
+		return
+	}
 	switch action {
 
 	case "count_vehicles":
 
-		if !dbConnected {
-			fmt.Printf("database not connected\n")
-			printInArma(output, outputsize, "db not con")
-			return
-		}
 		var vehicles []string
-		for i:=1;i < len(clearArgs); i++ {
-			vehicles = append(vehicles,clearArgs[i])
+		for i := 1; i < len(clearArgs); i++ {
+			vehicles = append(vehicles, clearArgs[i])
 		}
-		vehs := countVeh(clearArgs[0],vehicles)
-		printInArma(output,outputsize,vehs)
+		vehs := countVeh(clearArgs[0], vehicles)
+		printInArma(output, outputsize, vehs)
 		return
-
+	case "perf":
+		printInArma(output, outputsize, insertCpu(clearArgs[0], clearArgs[1], clearArgs[3]))
+		return
 	default:
 		temp := fmt.Sprintf("Undefined '%s' command", action)
 		printInArma(output, outputsize, temp)
 		return
 	}
 }
-
 
 func struct2JSON(v interface{}) string {
 	b, _ := json.Marshal(v)
@@ -102,11 +104,11 @@ func returnMyData(input string, errors error) string {
 	case "connectDB":
 		err := ReadConfig()
 		if err != nil {
-			return "config error : "+err.Error()
+			return "config error : " + err.Error()
 		}
 		db, err = ConnectDatabase()
 		if err != nil {
-			return "non "+err.Error()
+			return "non " + err.Error()
 		}
 		return "connected"
 	default:
@@ -116,5 +118,3 @@ func returnMyData(input string, errors error) string {
 }
 
 func main() {}
-
-
