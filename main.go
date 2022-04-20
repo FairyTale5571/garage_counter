@@ -8,9 +8,9 @@ package main
 import "C"
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"unsafe"
 )
 
@@ -29,7 +29,6 @@ func goRVExtensionVersion(output *C.char, outputsize C.size_t) {
 
 //export goRVExtensionArgs
 func goRVExtensionArgs(output *C.char, outputsize C.size_t, input *C.char, argv **C.char, argc C.int) {
-	//offset := unsafe.Sizeof(uintptr(0))
 	action := C.GoString(input)
 	clearArgs := cleanInput(argv, int(argc))
 
@@ -39,48 +38,22 @@ func goRVExtensionArgs(output *C.char, outputsize C.size_t, input *C.char, argv 
 		return
 	}
 	switch action {
+	case "clear_old_veh":
+		printInArma(output, outputsize, deleteOldVehicles(parseVehicleArray(0, clearArgs)))
+		return
 
 	case "count_vehicles":
-
-		var vehicles []string
-		for i := 1; i < len(clearArgs); i++ {
-			vehicles = append(vehicles, clearArgs[i])
-		}
-		vehs := countVeh(clearArgs[0], vehicles)
-		printInArma(output, outputsize, vehs)
+		printInArma(output, outputsize, countVeh(clearArgs[0], parseVehicleArray(1, clearArgs)))
 		return
 	case "perf":
-		printInArma(output, outputsize, insertCpu(clearArgs[0], clearArgs[1], clearArgs[3]))
+		fmt.Println(clearArgs)
+		printInArma(output, outputsize, insertCpu(clearArgs[0], clearArgs[1], clearArgs[2], clearArgs[3], clearArgs[4]))
 		return
 	default:
 		temp := fmt.Sprintf("Undefined '%s' command", action)
 		printInArma(output, outputsize, temp)
 		return
 	}
-}
-
-func struct2JSON(v interface{}) string {
-	b, _ := json.Marshal(v)
-	return string(b)
-}
-
-func cleanInput(argv **C.char, argc int) []string {
-	newArgs := make([]string, argc)
-	offset := unsafe.Sizeof(uintptr(0))
-	i := 0
-	for i < argc {
-		_arg := (**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(argv)) + offset*uintptr(i)))
-		arg := C.GoString(*_arg)
-		arg = arg[1 : len(arg)-1]
-
-		reArg := regexp.MustCompile(`""`)
-		arg = reArg.ReplaceAllString(arg, `"`)
-
-		newArgs[i] = arg
-		i++
-	}
-
-	return newArgs
 }
 
 func printInArma(output *C.char, outputsize C.size_t, input string) {
@@ -100,8 +73,22 @@ func goRVExtension(output *C.char, outputsize C.size_t, input *C.char) {
 }
 
 func returnMyData(input string, errors error) string {
-	switch input {
+	var vars []string
+	var inputSplit = strings.Split(input, "~")
+	var function = ""
+	for idx := range inputSplit {
+		if idx == 0 {
+			function = inputSplit[idx]
+		} else {
+			vars = append(vars, inputSplit[idx])
+		}
+	}
+
+	switch function {
 	case "connectDB":
+		if dbConnected {
+			return "connected"
+		}
 		err := ReadConfig()
 		if err != nil {
 			return "config error : " + err.Error()
@@ -110,11 +97,40 @@ func returnMyData(input string, errors error) string {
 		if err != nil {
 			return "non " + err.Error()
 		}
+		/*
+			cdb, err = ConnectClickHouse()
+			if err != nil {
+				return "non " + err.Error()
+			}
+		*/
 		return "connected"
+	case "perf":
+		return insertCpu(vars[0], vars[1], vars[2], vars[3], vars[4])
 	default:
-		return "undefined command"
+		return fmt.Sprintf("command %s is undefined", function)
 	}
+
 	return ""
+}
+
+func cleanInput(argv **C.char, argc int) []string {
+	fmt.Printf("cleanInput\n")
+	newArgs := make([]string, argc)
+	offset := unsafe.Sizeof(uintptr(0))
+	i := 0
+	for i < argc {
+		_arg := (**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(argv)) + offset*uintptr(i)))
+		arg := C.GoString(*_arg)
+		arg = arg[1 : len(arg)-1]
+
+		reArg := regexp.MustCompile(`""`)
+		arg = reArg.ReplaceAllString(arg, `"`)
+
+		newArgs[i] = arg
+		i++
+	}
+
+	return newArgs
 }
 
 func main() {}
